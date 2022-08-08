@@ -50,8 +50,23 @@ rm -f "$TESTFILE"
 rm -rf ffbuild
 mkdir ffbuild
 
-FFMPEG_REPO="${FFMPEG_REPO:-https://github.com/FFmpeg/FFmpeg.git}"
-FFMPEG_REPO="${FFMPEG_REPO_OVERRIDE:-$FFMPEG_REPO}"
+FFMPEG_REPO_OPTIONS=(
+  "https://git.ffmpeg.org/ffmpeg.git"
+  "https://github.com/FFmpeg/FFmpeg.git"
+  "https://git.videolan.org/git/ffmpeg.git"
+  )
+
+for repo_url in "${FFMPEG_REPO_OPTIONS[@]}"; do :;
+  if curl --output /dev/null -Is --fail "${repo_url}"; then
+    FFMPEG_REPO=${repo_url}
+    break
+  fi
+done
+
+echo "picking FFmpeg repo: ${repo_url}"
+
+# FFMPEG_REPO="${FFMPEG_REPO:-https://git.ffmpeg.org/ffmpeg.git}"
+# FFMPEG_REPO="${FFMPEG_REPO_OVERRIDE:-$FFMPEG_REPO}"
 GIT_BRANCH="${GIT_BRANCH:-master}"
 GIT_BRANCH="${GIT_BRANCH_OVERRIDE:-$GIT_BRANCH}"
 
@@ -63,13 +78,16 @@ cat <<EOF >"$BUILD_SCRIPT"
     cd /ffbuild
     rm -rf ffmpeg prefix
 
-    git clone --filter=blob:none --branch='$GIT_BRANCH' '$FFMPEG_REPO' ffmpeg
+    git clone --depth 1 --filter=blob:none --single-branch --branch='$GIT_BRANCH' '$FFMPEG_REPO' ffmpeg
     cd ffmpeg
 
     ./configure --prefix=/ffbuild/prefix --pkg-config-flags="--static" \$FFBUILD_TARGET_FLAGS $FF_CONFIGURE \
         --extra-cflags='$FF_CFLAGS' --extra-cxxflags='$FF_CXXFLAGS' \
         --extra-ldflags='$FF_LDFLAGS' --extra-ldexeflags='$FF_LDEXEFLAGS' --extra-libs='$FF_LIBS' \
-        --extra-version="\$(date +%Y%m%d)"
+        --extra-version="\$(date +%Y%m%d)" \
+        --disable-doc \
+        --disable-ffplay \
+        --disable-ffprobe
     make -j\$(nproc) V=1
     make install install-doc
 EOF
@@ -90,7 +108,7 @@ package_variant ffbuild/prefix "ffbuild/pkgroot/$BUILD_NAME"
 cd ffbuild/pkgroot
 if [[ "${TARGET}" == win* ]]; then
     OUTPUT_FNAME="${BUILD_NAME}.zip"
-    zip -9 -r "${ARTIFACTS_PATH}/${OUTPUT_FNAME}" "$BUILD_NAME"
+    zip -9 -j "${ARTIFACTS_PATH}/${OUTPUT_FNAME}" "$BUILD_NAME/bin/ffmpeg.exe"
 else
     OUTPUT_FNAME="${BUILD_NAME}.tar.xz"
     tar cJf "${ARTIFACTS_PATH}/${OUTPUT_FNAME}" "$BUILD_NAME"
