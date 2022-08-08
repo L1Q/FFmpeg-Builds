@@ -61,7 +61,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [win64]
+        target: [win64,win32]
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -97,8 +97,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [win64]
-        variant: [gpl 5.1]
+        target: [win64,win32]
+        variant: [gpl,gpl 5.1]
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -141,8 +141,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [win64]
-        variant: [gpl 5.1]
+        target: [win64,win32]
+        variant: [gpl,gpl 5.1]
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -185,6 +185,18 @@ jobs:
           hub release create $(for a in artifacts/*.{zip,tar.xz}; do echo -a $a; done) -m "$NAME" -t "master" "$TAGNAME"
           echo "::set-output name=tag_name::${TAGNAME}"
           echo "::set-output name=rel_date::${RELDATE}"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Update Latest
+        run: |
+          set -xe
+          shopt -s nullglob
+          NAME="Latest Auto-Build (${{ steps.create_release.outputs.rel_date }})"
+          TAGNAME="latest"
+          hub release delete "$TAGNAME" || true
+          git push --delete origin "$TAGNAME" || true
+          sleep 30
+          hub release create $(for a in artifacts/*.{zip,tar.xz}; do echo -a $a; done) -m "$NAME" -t "master" "$TAGNAME"
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Prune old releases
